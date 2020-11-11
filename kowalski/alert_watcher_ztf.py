@@ -219,7 +219,7 @@ def alert_filter__ml(alert, ml_models: dict = None) -> dict:
             scores['braai'] = float(braai)
             scores['braai_version'] = ml_models['braai']['version']
         # acai
-        for model_name in ("acai_h", "acai_v", "acai_o", "acai_n"):
+        for model_name in ("acai_h", "acai_v", "acai_o", "acai_n", "acai_b"):
             if model_name in ml_models.keys():
                 score = ml_models[model_name]['model'].predict([features, triplet])[0]
                 scores[model_name] = float(score)
