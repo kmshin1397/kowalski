@@ -22,6 +22,11 @@ COPY kowalski/server.properties /kafka_$kafka_version/config/
 
 # ML models:
 ADD https://github.com/dmitryduev/braai/raw/master/models/braai_d6_m9.h5 /app/models/
+ADD https://github.com/dmitryduev/acai-pub/raw/master/models/acai_h.d1.dnn.20201107.h5 /app/models/
+ADD https://github.com/dmitryduev/acai-pub/raw/master/models/acai_v.d1.dnn.20201109.h5 /app/models/
+ADD https://github.com/dmitryduev/acai-pub/raw/master/models/acai_o.d1.dnn.20201110.h5 /app/models/
+ADD https://github.com/dmitryduev/acai-pub/raw/master/models/acai_n.d1.dnn.20201110.h5 /app/models/
+
 
 # copy over the test alerts
 COPY data/ztf_alerts/ /app/data/ztf_alerts/

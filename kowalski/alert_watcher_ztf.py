@@ -35,6 +35,7 @@ from utils import (
     Mongo,
     radec2lb,
     time_stamp,
+    ZTFAlert,
 )
 
 
@@ -197,46 +198,6 @@ def make_thumbnail(alert, ttype: str, ztftype: str):
 ''' Alert filters '''
 
 
-def make_triplet(alert, to_tpu: bool = False):
-    """Make an L2-normalized cutout triplet out of a ZTF alert
-
-    :param alert:
-    :param to_tpu:
-    :return:
-    """
-    cutout_dict = dict()
-
-    for cutout in ('science', 'template', 'difference'):
-        cutout_data = alert[f'cutout{cutout.capitalize()}']['stampData']
-
-        # unzip
-        with gzip.open(io.BytesIO(cutout_data), 'rb') as f:
-            with fits.open(io.BytesIO(f.read())) as hdu:
-                data = hdu[0].data
-                # replace nans with zeros
-                cutout_dict[cutout] = np.nan_to_num(data)
-                # L2-normalize
-                cutout_dict[cutout] /= np.linalg.norm(cutout_dict[cutout])
-
-        # pad to 63x63 if smaller
-        shape = cutout_dict[cutout].shape
-        if shape != (63, 63):
-            # print(f'Shape of {candid}/{cutout}: {shape}, padding to (63, 63)')
-            cutout_dict[cutout] = np.pad(cutout_dict[cutout], [(0, 63 - shape[0]), (0, 63 - shape[1])],
-                                         mode='constant', constant_values=1e-9)
-
-    triplet = np.zeros((63, 63, 3))
-    triplet[:, :, 0] = cutout_dict['science']
-    triplet[:, :, 1] = cutout_dict['template']
-    triplet[:, :, 2] = cutout_dict['difference']
-
-    if to_tpu:
-        # Edge TPUs require additional processing
-        triplet = np.rint(triplet * 128 + 128).astype(np.uint8).flatten()
-
-    return triplet
-
-
 def alert_filter__ml(alert, ml_models: dict = None) -> dict:
     """Execute ML models on ZTF alerts
 
@@ -248,13 +209,21 @@ def alert_filter__ml(alert, ml_models: dict = None) -> dict:
     scores = dict()
 
     try:
-        ''' braai '''
-        triplet = make_triplet(alert)
-        triplets = np.expand_dims(triplet, axis=0)
-        braai = ml_models['braai']['model'].predict(x=triplets)[0]
-        # braai = 1.0
-        scores['braai'] = float(braai)
-        scores['braai_version'] = ml_models['braai']['version']
+        ztf_alert = ZTFAlert(alert)
+        features = np.expand_dims(ztf_alert.data["features"], axis=[0, -1])
+        triplet = np.expand_dims(ztf_alert.data["triplet"], axis=[0])
+
+        # braai
+        if "braai" in ml_models.keys():
+            braai = ml_models['braai']['model'].predict(x=triplet)[0]
+            scores['braai'] = float(braai)
+            scores['braai_version'] = ml_models['braai']['version']
+        # acai
+        for model_name in ("acai_h", "acai_v", "acai_o", "acai_n"):
+            if model_name in ml_models.keys():
+                score = ml_models[model_name]['model'].predict([features, triplet])[0]
+                scores[model_name] = float(score)
+                scores[f'{model_name}_version'] = ml_models[model_name]['version']
     except Exception as e:
         print(time_stamp(), str(e))
 
