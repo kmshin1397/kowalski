@@ -798,6 +798,8 @@ class ZTFAlert:
 
     def make_features(self, feature_names=None, norms=None):
         features = []
+        if feature_names is None:
+            feature_names = list(self.alert["candidate"].keys())
         for feature_name in feature_names:
             feature = self.alert["candidate"].get(feature_name)
             if feature is None and feature_name == "drb":
